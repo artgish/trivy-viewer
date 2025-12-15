@@ -1,68 +1,42 @@
 const express = require('express');
 const path = require('path');
-const { S3Client, ListObjectsV2Command, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { createStorageProvider, getProviderType } = require('./providers');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// S3 Configuration
-const s3Client = new S3Client();
-
-const S3_BUCKET = process.env.S3_BUCKET;
-if (!S3_BUCKET) {
-  throw new Error("S3_BUCKET env var is required");
+// Storage Configuration
+const STORAGE_LOCATION = process.env.STORAGE_LOCATION;
+if (!STORAGE_LOCATION) {
+  throw new Error("STORAGE_LOCATION env var is required");
 }
-const S3_PREFIX = process.env.S3_PREFIX || '';
-const ACTIVE_PATH = `${S3_PREFIX}/active`;
-const ARCHIVED_PATH = `${S3_PREFIX}/archived`;
+const STORAGE_PREFIX = process.env.STORAGE_PREFIX || '';
+
+// Create storage provider based on STORAGE_LOCATION
+const storageProvider = createStorageProvider(STORAGE_LOCATION, STORAGE_PREFIX);
 
 // Middleware
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Helper function to convert stream to string
-async function streamToString(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks).toString('utf-8');
-}
-
 // API Routes
 
-// List JSON files in S3 bucket (active path only) with pagination
+// List JSON files (active path only) with pagination
 app.get('/api/files', async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 1000, 1000);
     const continuationToken = req.query.continuationToken || undefined;
 
-    const command = new ListObjectsV2Command({
-      Bucket: S3_BUCKET,
-      Prefix: ACTIVE_PATH,
-      MaxKeys: limit,
-      ContinuationToken: continuationToken
-    });
+    const result = await storageProvider.listFiles(
+      storageProvider.activePath,
+      limit,
+      continuationToken
+    );
 
-    const response = await s3Client.send(command);
-
-    const files = (response.Contents || [])
-      .filter(obj => obj.Key.endsWith('.json'))
-      .map(obj => ({
-        key: obj.Key,
-        name: path.basename(obj.Key),
-        size: obj.Size,
-        lastModified: obj.LastModified
-      }));
-
-    res.json({
-      files,
-      nextContinuationToken: response.NextContinuationToken || null,
-      hasMore: response.IsTruncated || false
-    });
+    res.json(result);
   } catch (error) {
-    console.error('Error listing S3 files:', error);
-    res.status(500).json({ error: 'Failed to list files from S3', details: error.message });
+    console.error('Error listing files:', error);
+    res.status(500).json({ error: 'Failed to list files', details: error.message });
   }
 });
 
@@ -76,27 +50,19 @@ app.post('/api/files/archive', async (req, res) => {
     }
 
     // Verify the file is in the active path
-    if (!key.startsWith(ACTIVE_PATH)) {
+    if (!key.startsWith(storageProvider.activePath)) {
       return res.status(400).json({ error: 'File is not in the active path' });
     }
 
     const filename = path.basename(key);
-    const archivedKey = `${ARCHIVED_PATH}/${filename}`;
+    const isoDate = new Date().toISOString();
+    const archivedKey = `${storageProvider.archivedPath}/${filename}.${isoDate}`;
 
     // Copy file to archived path
-    const copyCommand = new CopyObjectCommand({
-      Bucket: S3_BUCKET,
-      CopySource: `${S3_BUCKET}/${key}`,
-      Key: archivedKey
-    });
-    await s3Client.send(copyCommand);
+    await storageProvider.copyFile(key, archivedKey);
 
     // Delete original file from active path
-    const deleteCommand = new DeleteObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: key
-    });
-    await s3Client.send(deleteCommand);
+    await storageProvider.deleteFile(key);
 
     res.json({
       message: 'File archived successfully',
@@ -109,27 +75,19 @@ app.post('/api/files/archive', async (req, res) => {
   }
 });
 
-// Get a specific file from S3
+// Get a specific file
 app.get('/api/files/:key(*)', async (req, res) => {
   try {
     const key = req.params.key;
 
-    const command = new GetObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: key
-    });
-
-    const response = await s3Client.send(command);
-    const content = await streamToString(response.Body);
-    const data = JSON.parse(content);
-
+    const data = await storageProvider.getFile(key);
     res.json(data);
   } catch (error) {
-    console.error('Error fetching S3 file:', error);
-    if (error.name === 'NoSuchKey') {
+    console.error('Error fetching file:', error);
+    if (error.name === 'NoSuchKey' || error.code === 'ENOENT' || error.code === 404) {
       res.status(404).json({ error: 'File not found' });
     } else {
-      res.status(500).json({ error: 'Failed to fetch file from S3', details: error.message });
+      res.status(500).json({ error: 'Failed to fetch file', details: error.message });
     }
   }
 });
@@ -152,8 +110,9 @@ app.use((error, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Trivy Viewer server running on http://localhost:${PORT}`);
-  console.log(`S3 Bucket: ${S3_BUCKET}`);
-  console.log(`S3 Prefix: ${S3_PREFIX}`);
-  console.log(`Active Path: ${ACTIVE_PATH}`);
-  console.log(`Archived Path: ${ARCHIVED_PATH}`);
+  console.log(`Storage Provider: ${getProviderType(STORAGE_LOCATION)}`);
+  console.log(`Storage Location: ${STORAGE_LOCATION}`);
+  console.log(`Storage Prefix: ${STORAGE_PREFIX}`);
+  console.log(`Active Path: ${storageProvider.activePath}`);
+  console.log(`Archived Path: ${storageProvider.archivedPath}`);
 });

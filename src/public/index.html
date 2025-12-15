@@ -100,7 +100,7 @@
             transform: translateY(0);
         }
 
-        .s3-btn {
+        .storage-btn {
             background: #10b981;
             color: white;
             padding: 0.875rem 2rem;
@@ -113,12 +113,12 @@
             transition: transform 0.2s ease;
         }
 
-        .s3-btn:hover {
+        .storage-btn:hover {
             transform: translateY(-2px);
             background: #059669;
         }
 
-        .s3-btn:disabled {
+        .storage-btn:disabled {
             background: #9ca3af;
             cursor: not-allowed;
             transform: none;
@@ -660,19 +660,19 @@
         <div id="uploadSection" class="upload-section">
             <h2 style="margin-bottom: 1rem;">Load Trivy Report</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Upload a local JSON file to view or select from S3 bucket
+                Upload a local JSON file to view or select from storage bucket
             </p>
             <input type="file" id="fileInput" accept=".json">
             <label for="fileInput" class="upload-btn">Upload Local File</label>
-            <button class="s3-btn" onclick="openS3Modal()">Browse S3 Files</button>
+            <button class="storage-btn" onclick="openstorageModal()">Browse storage Files</button>
         </div>
 
-        <!-- S3 File Selection Modal -->
-        <div id="s3Modal" class="modal-overlay">
+        <!-- storage File Selection Modal -->
+        <div id="storageModal" class="modal-overlay">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>Select Trivy Report from S3</h2>
-                    <button class="modal-close" onclick="closeS3Modal()">&times;</button>
+                    <h2>Select Trivy Report from storage</h2>
+                    <button class="modal-close" onclick="closestorageModal()">&times;</button>
                 </div>
                 <div id="fileListContainer" class="file-list">
                     <div class="loading">
@@ -681,8 +681,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="modal-btn cancel" onclick="closeS3Modal()">Cancel</button>
-                    <button id="loadS3FileBtn" class="modal-btn primary" onclick="loadSelectedS3File()" disabled>Load File</button>
+                    <button class="modal-btn cancel" onclick="closestorageModal()">Cancel</button>
+                    <button id="loadstorageFileBtn" class="modal-btn primary" onclick="loadSelectedstorageFile()" disabled>Load File</button>
                 </div>
             </div>
         </div>
@@ -737,9 +737,9 @@
         let trivyData = null;
         let allVulnerabilities = [];
         let currentFilters = new Set(['ALL']);
-        let s3Files = [];
-        let selectedS3File = null;
-        let currentLoadedS3File = null;
+        let storageFiles = [];
+        let selectedstorageFile = null;
+        let currentLoadedstorageFile = null;
 
         // File upload handler
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -769,22 +769,22 @@
             }
         });
 
-        // S3 Modal Functions
-        async function openS3Modal() {
-            const modal = document.getElementById('s3Modal');
+        // storage Modal Functions
+        async function openstorageModal() {
+            const modal = document.getElementById('storageModal');
             modal.classList.add('active');
-            selectedS3File = null;
-            document.getElementById('loadS3FileBtn').disabled = true;
-            await loadS3FileList();
+            selectedstorageFile = null;
+            document.getElementById('loadstorageFileBtn').disabled = true;
+            await loadstorageFileList();
         }
 
-        function closeS3Modal() {
-            const modal = document.getElementById('s3Modal');
+        function closestorageModal() {
+            const modal = document.getElementById('storageModal');
             modal.classList.remove('active');
-            selectedS3File = null;
+            selectedstorageFile = null;
         }
 
-        async function loadS3FileList() {
+        async function loadstorageFileList() {
             const container = document.getElementById('fileListContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
 
@@ -794,15 +794,15 @@
                     throw new Error('Failed to fetch file list');
                 }
                 const data = await response.json();
-                s3Files = data.files || [];
+                storageFiles = data.files || [];
 
-                if (s3Files.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><p>No JSON files found in S3 bucket</p></div>';
+                if (storageFiles.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><p>No JSON files found in storage bucket</p></div>';
                     return;
                 }
 
-                container.innerHTML = s3Files.map((file, index) => `
-                    <div class="file-item" data-index="${index}" onclick="selectS3File(${index})">
+                container.innerHTML = storageFiles.map((file, index) => `
+                    <div class="file-item" data-index="${index}" onclick="selectstorageFile(${index})">
                         <div class="file-item-content">
                             <div class="file-item-info">
                                 <div class="file-name">${escapeHtml(file.name)}</div>
@@ -819,28 +819,28 @@
             }
         }
 
-        function selectS3File(index) {
+        function selectstorageFile(index) {
             document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
             document.querySelector(`.file-item[data-index="${index}"]`).classList.add('selected');
-            selectedS3File = s3Files[index];
-            document.getElementById('loadS3FileBtn').disabled = false;
+            selectedstorageFile = storageFiles[index];
+            document.getElementById('loadstorageFileBtn').disabled = false;
         }
 
-        async function loadSelectedS3File() {
-            if (!selectedS3File) return;
+        async function loadSelectedstorageFile() {
+            if (!selectedstorageFile) return;
 
-            const btn = document.getElementById('loadS3FileBtn');
+            const btn = document.getElementById('loadstorageFileBtn');
             btn.disabled = true;
             btn.textContent = 'Loading...';
 
             try {
-                const response = await fetch(`/api/files/${encodeURIComponent(selectedS3File.key)}`);
+                const response = await fetch(`/api/files/${encodeURIComponent(selectedstorageFile.key)}`);
                 if (!response.ok) {
                     throw new Error('Failed to load file');
                 }
                 const data = await response.json();
-                currentLoadedS3File = selectedS3File;
-                closeS3Modal();
+                currentLoadedstorageFile = selectedstorageFile;
+                closestorageModal();
                 processData(data);
                 updateDashboardArchiveButton();
             } catch (error) {
@@ -854,7 +854,7 @@
         // Archive functions
         async function archiveFile(event, index) {
             event.stopPropagation();
-            const file = s3Files[index];
+            const file = storageFiles[index];
             if (!confirm(`Are you sure you want to archive "${file.name}"?`)) {
                 return;
             }
@@ -875,7 +875,7 @@
                     throw new Error(error.error || 'Failed to archive file');
                 }
 
-                await loadS3FileList();
+                await loadstorageFileList();
             } catch (error) {
                 alert('Error archiving file: ' + error.message);
                 btn.disabled = false;
@@ -884,12 +884,12 @@
         }
 
         async function archiveCurrentFile() {
-            if (!currentLoadedS3File) {
-                alert('No S3 file is currently loaded');
+            if (!currentLoadedstorageFile) {
+                alert('No storage file is currently loaded');
                 return;
             }
 
-            if (!confirm(`Are you sure you want to archive "${currentLoadedS3File.name}"?`)) {
+            if (!confirm(`Are you sure you want to archive "${currentLoadedstorageFile.name}"?`)) {
                 return;
             }
 
@@ -901,7 +901,7 @@
                 const response = await fetch('/api/files/archive', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: currentLoadedS3File.key })
+                    body: JSON.stringify({ key: currentLoadedstorageFile.key })
                 });
 
                 if (!response.ok) {
@@ -910,7 +910,7 @@
                 }
 
                 alert('File archived successfully');
-                currentLoadedS3File = null;
+                currentLoadedstorageFile = null;
                 goBack();
             } catch (error) {
                 alert('Error archiving file: ' + error.message);
@@ -921,7 +921,7 @@
 
         function updateDashboardArchiveButton() {
             const btn = document.getElementById('dashboardArchiveBtn');
-            if (currentLoadedS3File) {
+            if (currentLoadedstorageFile) {
                 btn.style.display = 'block';
             } else {
                 btn.style.display = 'none';
@@ -936,7 +936,7 @@
             trivyData = null;
             allVulnerabilities = [];
             currentFilters = new Set(['ALL']);
-            currentLoadedS3File = null;
+            currentLoadedstorageFile = null;
         }
 
         function loadLocalFile(file) {
@@ -950,7 +950,7 @@
                 try {
                     const data = JSON.parse(e.target.result);
                     uploadSection.removeChild(loadingDiv);
-                    currentLoadedS3File = null;
+                    currentLoadedstorageFile = null;
                     processData(data);
                     updateDashboardArchiveButton();
                 } catch (error) {
