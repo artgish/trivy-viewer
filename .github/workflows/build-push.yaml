@@ -31,7 +31,7 @@ jobs:
           password: "${{ secrets.QUAY_PASSWORD }}"
           registry: quay.io
 
-      - name: set tags
+      - name: setup
         shell: bash
         run: |
           if [ "${GITHUB_REF_NAME}" == 'main' ]; then
@@ -42,7 +42,7 @@ jobs:
           if [ "${GITHUB_EVENT_NAME}" != 'workflow_dispatch' ]; then
             TAGS+=",quay.io/artgish/trivy-viewer:latest"
           fi
-          echo "TAGS=${TAGS}" $GITHUB_ENV
+          echo "TAGS=${TAGS}" >> $GITHUB_ENV
 
       - name: build and push
         uses: docker/build-push-action@v6.18.0
