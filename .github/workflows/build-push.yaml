@@ -35,10 +35,14 @@ jobs:
         shell: bash
         run: |
           if [ "${GITHUB_REF_NAME}" == 'main' ]; then
-            echo TAGS="quay.io/artgish/trivy-viewer:main" >> $GITHUB_ENV
+            TAGS="quay.io/artgish/trivy-viewer:main"
           else
-            echo TAGS="quay.io/artgish/trivy-viewer:latest,quay.io/artgish/trivy-viewer:${GITHUB_REF_NAME}" >> $GITHUB_ENV
+            TAGS="quay.io/artgish/trivy-viewer:${GITHUB_REF_NAME}"
           fi
+          if [ "${GITHUB_EVENT_NAME}" != 'workflow_dispatch' ]; then
+            TAGS+=",quay.io/artgish/trivy-viewer:latest"
+          fi
+          echo "TAGS=${TAGS}" $GITHUB_ENV
 
       - name: build and push
         uses: docker/build-push-action@v6.18.0
