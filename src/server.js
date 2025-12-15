@@ -78,8 +78,10 @@ app.post('/api/files/archive', async (req, res) => {
 // Get a specific file
 app.get('/api/files/:key(*)', async (req, res) => {
   try {
-    const key = req.params.key;
-
+    let key = req.params.key;
+    if (!key.startsWith(`${storageProvider.prefix}/active/`)) {
+      key = `${storageProvider.prefix}/active/${key}`;
+    }
     const data = await storageProvider.getFile(key);
     res.json(data);
   } catch (error) {
@@ -95,6 +97,11 @@ app.get('/api/files/:key(*)', async (req, res) => {
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Direct file viewer - serves HTML which will auto-load the file
+app.get('/files/:filename', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Serve the main HTML file for all other routes

@@ -1256,6 +1256,54 @@
                 timeout = setTimeout(later, wait);
             };
         }
+
+        // Auto-load file from URL path /files/{filename}
+        async function loadFileFromUrl() {
+            const pathMatch = window.location.pathname.match(/^\/files\/(.+)$/);
+            if (!pathMatch) return;
+
+            const filename = decodeURIComponent(pathMatch[1]);
+            const uploadSection = document.getElementById('uploadSection');
+
+            // Show loading state
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = `<div class="spinner"></div><p>Loading ${escapeHtml(filename)}...</p>`;
+            uploadSection.innerHTML = '';
+            uploadSection.appendChild(loadingDiv);
+
+            try {
+                const response = await fetch(`/api/files/${encodeURIComponent(filename)}`);
+                if (!response.ok) {
+                    throw new Error('File not found');
+                }
+                const data = await response.json();
+                currentLoadedstorageFile = { name: filename, key: filename };
+                processData(data);
+                updateDashboardArchiveButton();
+            } catch (error) {
+                uploadSection.innerHTML = `
+                    <div class="error-message">Error loading file: ${escapeHtml(error.message)}</div>
+                    <h2 style="margin-bottom: 1rem; margin-top: 1rem;">Load Trivy Report</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        Upload a local JSON file to view or select from storage bucket
+                    </p>
+                    <input type="file" id="fileInput" accept=".json">
+                    <label for="fileInput" class="upload-btn">Upload Local File</label>
+                    <button class="storage-btn" onclick="openstorageModal()">Browse storage Files</button>
+                `;
+                // Re-attach file input listener
+                document.getElementById('fileInput').addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        loadLocalFile(file);
+                    }
+                });
+            }
+        }
+
+        // Check for file in URL on page load
+        loadFileFromUrl();
     </script>
 </body>
 </html>
