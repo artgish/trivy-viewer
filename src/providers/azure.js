@@ -15,7 +15,6 @@ class AzureStorageProvider {
 
     this.activePath = prefix ? `${prefix}/active` : 'active';
     this.archivedPath = prefix ? `${prefix}/archived` : 'archived';
-    console.log(`Provider=AzureStorageProvider Path=${this.account_url}/${this.containerName}/${prefix}`)
   }
 
   async listFiles(subPath, limit = 1000, continuationToken = undefined) {
