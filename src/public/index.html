@@ -166,6 +166,21 @@
             font-size: 1.5rem;
         }
 
+        .file-search-box {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .file-search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .modal-close {
             background: none;
             border: none;
@@ -674,6 +689,7 @@
                     <h2>Select Trivy Report from storage</h2>
                     <button class="modal-close" onclick="closestorageModal()">&times;</button>
                 </div>
+                <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()">
                 <div id="fileListContainer" class="file-list">
                     <div class="loading">
                         <div class="spinner"></div>
@@ -775,6 +791,7 @@
             modal.classList.add('active');
             selectedstorageFile = null;
             document.getElementById('loadstorageFileBtn').disabled = true;
+            document.getElementById('fileSearchBox').value = '';
             await loadstorageFileList();
         }
 
@@ -824,6 +841,41 @@
             document.querySelector(`.file-item[data-index="${index}"]`).classList.add('selected');
             selectedstorageFile = storageFiles[index];
             document.getElementById('loadstorageFileBtn').disabled = false;
+        }
+
+        function filterFileList() {
+            const searchTerm = document.getElementById('fileSearchBox').value.toLowerCase();
+            const container = document.getElementById('fileListContainer');
+
+            if (storageFiles.length === 0) {
+                return;
+            }
+
+            const filteredFiles = storageFiles.filter((file, index) => {
+                return file.name.toLowerCase().includes(searchTerm);
+            });
+
+            if (filteredFiles.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No files match your search</p></div>';
+                return;
+            }
+
+            container.innerHTML = filteredFiles.map((file) => {
+                const originalIndex = storageFiles.indexOf(file);
+                return `
+                    <div class="file-item${selectedstorageFile === file ? ' selected' : ''}" data-index="${originalIndex}" onclick="selectstorageFile(${originalIndex})">
+                        <div class="file-item-content">
+                            <div class="file-item-info">
+                                <div class="file-name">${escapeHtml(file.name)}</div>
+                                <div class="file-meta">
+                                    ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                                </div>
+                            </div>
+                            <button class="archive-btn" onclick="archiveFile(event, ${originalIndex})">Archive</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         async function loadSelectedstorageFile() {

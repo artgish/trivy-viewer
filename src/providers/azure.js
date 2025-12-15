@@ -5,7 +5,6 @@ const path = require('path');
 class AzureStorageProvider {
   constructor(blobLocation, prefix = '') {
     const splited = blobLocation.split("/");
-    const account_url = `https://${splited[0]}.blob.core.windows.net`;
     this.containerName = splited[1];
     this.prefix = prefix;
     this.account_url = `https://${splited[0]}.blob.core.windows.net`;
