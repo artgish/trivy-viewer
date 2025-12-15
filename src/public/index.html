@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔎</text></svg>">
+    <title>Trivy Scan Visualizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --critical: #dc2626;
+            --high: #ea580c;
+            --medium: #f59e0b;
+            --low: #3b82f6;
+            --unknown: #6b7280;
+            --bg-primary: #f9fafb;
+            --bg-secondary: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+
+        .upload-section {
+            background: var(--bg-secondary);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section.dragover {
+            border-color: #667eea;
+            background-color: #f3f4f6;
+        }
+
+        .upload-section input[type="file"] {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            display: inline-block;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0);
+        }
+
+        .s3-btn {
+            background: #10b981;
+            color: white;
+            padding: 0.875rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .s3-btn:hover {
+            transform: translateY(-2px);
+            background: #059669;
+        }
+
+        .s3-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .file-item {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .file-item:last-child {
+            border-bottom: none;
+        }
+
+        .file-item:hover {
+            background-color: #f3f4f6;
+        }
+
+        .file-item.selected {
+            background-color: #e0e7ff;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .file-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .file-item-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .archive-btn {
+            background: #f59e0b;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .archive-btn:hover {
+            background: #d97706;
+            transform: translateY(-1px);
+        }
+
+        .archive-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .modal-footer {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+
+        .modal-btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn.cancel {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.cancel:hover {
+            border-color: #667eea;
+        }
+
+        .modal-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+
+        .modal-btn.primary:hover {
+            transform: translateY(-2px);
+        }
+
+        .modal-btn.primary:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .back-btn {
+            background: #6b7280;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 1.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            background: #4b5563;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .dashboard-header .back-btn {
+            margin-bottom: 0;
+        }
+
+        .dashboard-header .archive-btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .metadata-section {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .metadata-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .metadata-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .metadata-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .metadata-value {
+            font-size: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .stat-card.total .stat-value { color: #6b7280; }
+        .stat-card.critical .stat-value { color: var(--critical); }
+        .stat-card.high .stat-value { color: var(--high); }
+        .stat-card.medium .stat-value { color: var(--medium); }
+        .stat-card.low .stat-value { color: var(--low); }
+        .stat-card.unknown .stat-value { color: var(--unknown); }
+
+        .controls {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 250px;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid var(--border);
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover {
+            border-color: #667eea;
+        }
+
+        .filter-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .filter-btn.critical.active { background: var(--critical); border-color: var(--critical); }
+        .filter-btn.high.active { background: var(--high); border-color: var(--high); }
+        .filter-btn.medium.active { background: var(--medium); border-color: var(--medium); }
+        .filter-btn.low.active { background: var(--low); border-color: var(--low); }
+        .filter-btn.unknown.active { background: var(--unknown); border-color: var(--unknown); }
+
+        .table-container {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f3f4f6;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        tbody tr:hover {
+            background-color: #f9fafb;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: white;
+        }
+
+        .severity-badge.CRITICAL { background: var(--critical); }
+        .severity-badge.HIGH { background: var(--high); }
+        .severity-badge.MEDIUM { background: var(--medium); }
+        .severity-badge.LOW { background: var(--low); }
+        .severity-badge.UNKNOWN { background: var(--unknown); }
+
+        .cve-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .cve-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .package-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .package-name {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .package-version {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .description-cell {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            border: 3px solid var(--border);
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border-left: 4px solid var(--critical);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .controls-row {
+                flex-direction: column;
+            }
+
+            .search-box {
+                width: 100%;
+            }
+
+            table {
+                font-size: 0.875rem;
+            }
+
+            th, td {
+                padding: 0.75rem 0.5rem;
+            }
+
+            .description-cell {
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Trivy Security Scan Viewer</h1>
+            <p class="subtitle">Visualize and analyze container vulnerability reports</p>
+        </header>
+
+        <div id="uploadSection" class="upload-section">
+            <h2 style="margin-bottom: 1rem;">Load Trivy Report</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Upload a local JSON file to view or select from S3 bucket
+            </p>
+            <input type="file" id="fileInput" accept=".json">
+            <label for="fileInput" class="upload-btn">Upload Local File</label>
+            <button class="s3-btn" onclick="openS3Modal()">Browse S3 Files</button>
+        </div>
+
+        <!-- S3 File Selection Modal -->
+        <div id="s3Modal" class="modal-overlay">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Select Trivy Report from S3</h2>
+                    <button class="modal-close" onclick="closeS3Modal()">&times;</button>
+                </div>
+                <div id="fileListContainer" class="file-list">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading files...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="modal-btn cancel" onclick="closeS3Modal()">Cancel</button>
+                    <button id="loadS3FileBtn" class="modal-btn primary" onclick="loadSelectedS3File()" disabled>Load File</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard" class="dashboard">
+            <div class="dashboard-header">
+                <button class="back-btn" onclick="goBack()">← Back to File Selection</button>
+                <button id="dashboardArchiveBtn" class="archive-btn" onclick="archiveCurrentFile()">Archive</button>
+            </div>
+            <div class="metadata-section">
+                <h2 style="margin-bottom: 1rem;">Scan Metadata</h2>
+                <div class="metadata-grid" id="metadataGrid"></div>
+            </div>
+
+            <div class="stats-grid" id="statsGrid"></div>
+
+            <div class="controls">
+                <div class="controls-row">
+                    <input type="text" id="searchBox" class="search-box" placeholder="Search vulnerabilities...">
+                    <div class="filter-group">
+                        <button class="filter-btn active" data-severity="ALL" onclick="toggleFilter(this)">ALL</button>
+                        <button class="filter-btn critical" data-severity="CRITICAL" onclick="toggleFilter(this)">CRITICAL</button>
+                        <button class="filter-btn high" data-severity="HIGH" onclick="toggleFilter(this)">HIGH</button>
+                        <button class="filter-btn medium" data-severity="MEDIUM" onclick="toggleFilter(this)">MEDIUM</button>
+                        <button class="filter-btn low" data-severity="LOW" onclick="toggleFilter(this)">LOW</button>
+                        <button class="filter-btn unknown" data-severity="UNKNOWN" onclick="toggleFilter(this)">UNKNOWN</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <div class="table-wrapper">
+                    <table id="vulnerabilitiesTable">
+                        <thead>
+                            <tr>
+                                <th>CVE ID</th>
+                                <th>Package</th>
+                                <th>Installed Version</th>
+                                <th>Fixed Version</th>
+                                <th>Severity</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let trivyData = null;
+        let allVulnerabilities = [];
+        let currentFilters = new Set(['ALL']);
+        let s3Files = [];
+        let selectedS3File = null;
+        let currentLoadedS3File = null;
+
+        // File upload handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadLocalFile(file);
+            }
+        });
+
+        // Drag and drop
+        const uploadSection = document.getElementById('uploadSection');
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/json') {
+                loadLocalFile(file);
+            }
+        });
+
+        // S3 Modal Functions
+        async function openS3Modal() {
+            const modal = document.getElementById('s3Modal');
+            modal.classList.add('active');
+            selectedS3File = null;
+            document.getElementById('loadS3FileBtn').disabled = true;
+            await loadS3FileList();
+        }
+
+        function closeS3Modal() {
+            const modal = document.getElementById('s3Modal');
+            modal.classList.remove('active');
+            selectedS3File = null;
+        }
+
+        async function loadS3FileList() {
+            const container = document.getElementById('fileListContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
+
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch file list');
+                }
+                const data = await response.json();
+                s3Files = data.files || [];
+
+                if (s3Files.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><p>No JSON files found in S3 bucket</p></div>';
+                    return;
+                }
+
+                container.innerHTML = s3Files.map((file, index) => `
+                    <div class="file-item" data-index="${index}" onclick="selectS3File(${index})">
+                        <div class="file-item-content">
+                            <div class="file-item-info">
+                                <div class="file-name">${escapeHtml(file.name)}</div>
+                                <div class="file-meta">
+                                    ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                                </div>
+                            </div>
+                            <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = `<div class="error-message">Error loading files: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+
+        function selectS3File(index) {
+            document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
+            document.querySelector(`.file-item[data-index="${index}"]`).classList.add('selected');
+            selectedS3File = s3Files[index];
+            document.getElementById('loadS3FileBtn').disabled = false;
+        }
+
+        async function loadSelectedS3File() {
+            if (!selectedS3File) return;
+
+            const btn = document.getElementById('loadS3FileBtn');
+            btn.disabled = true;
+            btn.textContent = 'Loading...';
+
+            try {
+                const response = await fetch(`/api/files/${encodeURIComponent(selectedS3File.key)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to load file');
+                }
+                const data = await response.json();
+                currentLoadedS3File = selectedS3File;
+                closeS3Modal();
+                processData(data);
+                updateDashboardArchiveButton();
+            } catch (error) {
+                alert('Error loading file: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Load File';
+            }
+        }
+
+        // Archive functions
+        async function archiveFile(event, index) {
+            event.stopPropagation();
+            const file = s3Files[index];
+            if (!confirm(`Are you sure you want to archive "${file.name}"?`)) {
+                return;
+            }
+
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Archiving...';
+
+            try {
+                const response = await fetch('/api/files/archive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: file.key })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to archive file');
+                }
+
+                await loadS3FileList();
+            } catch (error) {
+                alert('Error archiving file: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Archive';
+            }
+        }
+
+        async function archiveCurrentFile() {
+            if (!currentLoadedS3File) {
+                alert('No S3 file is currently loaded');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to archive "${currentLoadedS3File.name}"?`)) {
+                return;
+            }
+
+            const btn = document.getElementById('dashboardArchiveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Archiving...';
+
+            try {
+                const response = await fetch('/api/files/archive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: currentLoadedS3File.key })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to archive file');
+                }
+
+                alert('File archived successfully');
+                currentLoadedS3File = null;
+                goBack();
+            } catch (error) {
+                alert('Error archiving file: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Archive';
+            }
+        }
+
+        function updateDashboardArchiveButton() {
+            const btn = document.getElementById('dashboardArchiveBtn');
+            if (currentLoadedS3File) {
+                btn.style.display = 'block';
+            } else {
+                btn.style.display = 'none';
+            }
+        }
+
+        // Go back to file selection
+        function goBack() {
+            document.getElementById('uploadSection').style.display = 'block';
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('fileInput').value = '';
+            trivyData = null;
+            allVulnerabilities = [];
+            currentFilters = new Set(['ALL']);
+            currentLoadedS3File = null;
+        }
+
+        function loadLocalFile(file) {
+            const reader = new FileReader();
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = '<div class="spinner"></div><p>Processing file...</p>';
+            uploadSection.appendChild(loadingDiv);
+
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    uploadSection.removeChild(loadingDiv);
+                    currentLoadedS3File = null;
+                    processData(data);
+                    updateDashboardArchiveButton();
+                } catch (error) {
+                    uploadSection.removeChild(loadingDiv);
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error-message';
+                    errorDiv.textContent = 'Error: Invalid JSON file. ' + error.message;
+                    uploadSection.insertBefore(errorDiv, uploadSection.firstChild);
+                    setTimeout(() => errorDiv.remove(), 5000);
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        function processData(data) {
+            trivyData = data;
+
+            // Extract all vulnerabilities from Results array
+            allVulnerabilities = [];
+            if (data.Results && Array.isArray(data.Results)) {
+                data.Results.forEach(result => {
+                    if (result.Vulnerabilities && Array.isArray(result.Vulnerabilities)) {
+                        allVulnerabilities.push(...result.Vulnerabilities);
+                    }
+                });
+            }
+
+            // Display dashboard
+            document.getElementById('uploadSection').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+
+            renderMetadata();
+            renderStats();
+            renderTable();
+
+            // Setup search
+            document.getElementById('searchBox').addEventListener('input', debounce(renderTable, 300));
+        }
+
+        function renderMetadata() {
+            const metadata = trivyData.Metadata || {};
+            const os = metadata.OS || {};
+
+            const metadataItems = [
+                { label: 'Artifact Name', value: trivyData.ArtifactName || 'N/A' },
+                { label: 'Artifact Type', value: trivyData.ArtifactType || 'N/A' },
+                { label: 'OS Family', value: os.Family || 'N/A' },
+                { label: 'OS Name', value: os.Name || 'N/A' },
+                { label: 'Created At', value: trivyData.CreatedAt ? new Date(trivyData.CreatedAt).toLocaleString() : 'N/A' },
+                { label: 'Schema Version', value: trivyData.SchemaVersion || 'N/A' }
+            ];
+
+            if (metadata.Size) {
+                metadataItems.push({
+                    label: 'Image Size',
+                    value: formatBytes(metadata.Size)
+                });
+            }
+
+            const metadataGrid = document.getElementById('metadataGrid');
+            metadataGrid.innerHTML = metadataItems.map(item => `
+                <div class="metadata-item">
+                    <div class="metadata-label">${item.label}</div>
+                    <div class="metadata-value">${item.value}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderStats() {
+            const stats = {
+                total: allVulnerabilities.length,
+                CRITICAL: 0,
+                HIGH: 0,
+                MEDIUM: 0,
+                LOW: 0,
+                UNKNOWN: 0
+            };
+
+            allVulnerabilities.forEach(vuln => {
+                const severity = vuln.Severity || 'UNKNOWN';
+                stats[severity] = (stats[severity] || 0) + 1;
+            });
+
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = `
+                <div class="stat-card total">
+                    <div class="stat-label">Total</div>
+                    <div class="stat-value">${stats.total}</div>
+                </div>
+                <div class="stat-card critical">
+                    <div class="stat-label">Critical</div>
+                    <div class="stat-value">${stats.CRITICAL}</div>
+                </div>
+                <div class="stat-card high">
+                    <div class="stat-label">High</div>
+                    <div class="stat-value">${stats.HIGH}</div>
+                </div>
+                <div class="stat-card medium">
+                    <div class="stat-label">Medium</div>
+                    <div class="stat-value">${stats.MEDIUM}</div>
+                </div>
+                <div class="stat-card low">
+                    <div class="stat-label">Low</div>
+                    <div class="stat-value">${stats.LOW}</div>
+                </div>
+                <div class="stat-card unknown">
+                    <div class="stat-label">Unknown</div>
+                    <div class="stat-value">${stats.UNKNOWN}</div>
+                </div>
+            `;
+        }
+
+        function renderTable() {
+            const searchTerm = document.getElementById('searchBox').value.toLowerCase();
+
+            // Filter vulnerabilities
+            let filtered = allVulnerabilities.filter(vuln => {
+                // Severity filter
+                if (!currentFilters.has('ALL')) {
+                    if (!currentFilters.has(vuln.Severity || 'UNKNOWN')) {
+                        return false;
+                    }
+                }
+
+                // Search filter
+                if (searchTerm) {
+                    const searchableText = [
+                        vuln.VulnerabilityID,
+                        vuln.PkgName,
+                        vuln.Description,
+                        vuln.Title,
+                        vuln.Severity
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    if (!searchableText.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            const tableBody = document.getElementById('tableBody');
+
+            if (filtered.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6">
+                            <div class="no-results">
+                                No vulnerabilities found matching your filters.
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = filtered.map(vuln => {
+                const cveId = vuln.VulnerabilityID || 'N/A';
+                const pkgName = vuln.PkgName || 'N/A';
+                const installedVersion = vuln.InstalledVersion || 'N/A';
+                const fixedVersion = vuln.FixedVersion || 'Not available';
+                const severity = vuln.Severity || 'UNKNOWN';
+                const description = vuln.Title || vuln.Description || 'No description available';
+                const url = vuln.PrimaryURL || '#';
+
+                return `
+                    <tr>
+                        <td>
+                            ${url !== '#' ? `<a href="${url}" target="_blank" class="cve-link">${cveId}</a>` : cveId}
+                        </td>
+                        <td>
+                            <div class="package-info">
+                                <span class="package-name">${pkgName}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="package-version">${installedVersion}</span>
+                        </td>
+                        <td>
+                            <span class="package-version">${fixedVersion}</span>
+                        </td>
+                        <td>
+                            <span class="severity-badge ${severity}">${severity}</span>
+                        </td>
+                        <td>
+                            <div class="description-cell" title="${escapeHtml(description)}">
+                                ${escapeHtml(description)}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function toggleFilter(button) {
+            const severity = button.dataset.severity;
+
+            if (severity === 'ALL') {
+                currentFilters.clear();
+                currentFilters.add('ALL');
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                button.classList.add('active');
+            } else {
+                currentFilters.delete('ALL');
+                document.querySelector('[data-severity="ALL"]').classList.remove('active');
+
+                if (currentFilters.has(severity)) {
+                    currentFilters.delete(severity);
+                    button.classList.remove('active');
+                } else {
+                    currentFilters.add(severity);
+                    button.classList.add('active');
+                }
+
+                // If no filters selected, select ALL
+                if (currentFilters.size === 0) {
+                    currentFilters.add('ALL');
+                    document.querySelector('[data-severity="ALL"]').classList.add('active');
+                }
+            }
+
+            renderTable();
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+</body>
+</html>
