@@ -496,6 +496,50 @@
         .filter-btn.low.active { background: var(--low); border-color: var(--low); }
         .filter-btn.unknown.active { background: var(--unknown); border-color: var(--unknown); }
 
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: auto;
+        }
+
+        .toggle-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .toggle-switch.active {
+            background: #10b981;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
         .table-container {
             background: var(--bg-secondary);
             border-radius: 12px;
@@ -726,6 +770,10 @@
                         <button class="filter-btn low" data-severity="LOW" onclick="toggleFilter(this)">LOW</button>
                         <button class="filter-btn unknown" data-severity="UNKNOWN" onclick="toggleFilter(this)">UNKNOWN</button>
                     </div>
+                    <div class="toggle-group">
+                        <span class="toggle-label">Fixable only</span>
+                        <div id="fixableToggle" class="toggle-switch" onclick="toggleFixableFilter()" title="Hide vulnerabilities without a fixed version"></div>
+                    </div>
                 </div>
             </div>
 
@@ -753,6 +801,7 @@
         let trivyData = null;
         let allVulnerabilities = [];
         let currentFilters = new Set(['ALL']);
+        let showFixableOnly = false;
         let storageFiles = [];
         let selectedstorageFile = null;
         let currentLoadedstorageFile = null;
@@ -988,6 +1037,8 @@
             trivyData = null;
             allVulnerabilities = [];
             currentFilters = new Set(['ALL']);
+            showFixableOnly = false;
+            document.getElementById('fixableToggle').classList.remove('active');
             currentLoadedstorageFile = null;
         }
 
@@ -1128,6 +1179,13 @@
                     }
                 }
 
+                // Fixable filter - hide entries without a fixed version
+                if (showFixableOnly) {
+                    if (!vuln.FixedVersion) {
+                        return false;
+                    }
+                }
+
                 // Search filter
                 if (searchTerm) {
                     const searchableText = [
@@ -1228,6 +1286,13 @@
                 }
             }
 
+            renderTable();
+        }
+
+        function toggleFixableFilter() {
+            showFixableOnly = !showFixableOnly;
+            const toggle = document.getElementById('fixableToggle');
+            toggle.classList.toggle('active', showFixableOnly);
             renderTable();
         }
 

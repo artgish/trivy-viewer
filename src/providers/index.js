@@ -51,13 +51,9 @@ function createStorageProvider(storageLocation, storagePrefix = '') {
     return new AzureStorageProvider(container, storagePrefix);
   }
 
-  // GCS: gs://bucket-name or gcs://bucket-name
+  // GCS: gs://bucket-name
   if (storageLocation.startsWith('gs://')) {
     const bucket = storageLocation.slice(5); // Remove 'gs://'
-    return new GCSStorageProvider(bucket, storagePrefix);
-  }
-  if (storageLocation.startsWith('gcs://')) {
-    const bucket = storageLocation.slice(6); // Remove 'gcs://'
     return new GCSStorageProvider(bucket, storagePrefix);
   }
 
@@ -74,7 +70,7 @@ function getProviderType(storageLocation) {
   if (!storageLocation) return 'unknown';
   if (storageLocation.startsWith('s3://')) return 'S3';
   if (storageLocation.startsWith('azure://')) return 'Azure Blob';
-  if (storageLocation.startsWith('gs://') || storageLocation.startsWith('gcs://')) return 'GCS';
+  if (storageLocation.startsWith('gs://')) return 'GCS';
   return 'Filesystem';
 }
 

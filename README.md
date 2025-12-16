@@ -133,8 +133,6 @@ s3://your-bucket-name/
 
 ```bash
 STORAGE_LOCATION=gs://your-bucket-name
-# or
-STORAGE_LOCATION=gcs://your-bucket-name
 
 STORAGE_PREFIX=trivy-reports
 ```
@@ -337,7 +335,7 @@ docker run -d \
   trivy-viewer:latest
 ```
 
-### Run with GCS Storage
+### Run with Google Cloud Storage
 
 ```bash
 docker run -d \
@@ -439,11 +437,6 @@ trivy-viewer/
 - Verify that files are in the `active/` subdirectory within your storage location
 - Ensure files have a `.json` extension
 - Check storage provider credentials and permissions
-
-**Authentication errors with cloud providers**
-- **S3**: Verify AWS credentials and IAM permissions (requires `s3:ListBucket`, `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`)
-- **GCS**: Ensure `GOOGLE_APPLICATION_CREDENTIALS` points to a valid service account key, or authenticate with `gcloud auth application-default login`
-- **Azure**: Verify Azure credentials and ensure the service principal has `Storage Blob Data Contributor` role
 
 **Cannot archive files**
 - Ensure the storage provider has write and delete permissions
