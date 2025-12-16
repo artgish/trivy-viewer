@@ -699,7 +699,10 @@
 
         <div id="uploadSection" class="upload-section">
             <h2 style="margin-bottom: 1rem;">Select Trivy Report</h2>
-            <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()" style="margin-bottom: 0;">
+                <button class="upload-btn" onclick="loadstorageFileList()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Refresh</button>
+            </div>
             <div id="fileListContainer" class="file-list main-file-list">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -777,6 +780,7 @@
         let currentFilters = new Set(['ALL']);
         let showFixableOnly = false;
         let storageFiles = [];
+        let nextContinuationToken = null;
         let currentLoadedstorageFile = null;
         let currentLocalFile = null; // { filename: string, content: object } - tracks locally opened files
 
@@ -819,24 +823,51 @@
         });
 
         // Storage File List Functions
-        async function loadstorageFileList() {
+        async function loadstorageFileList(continuationToken) {
             const container = document.getElementById('fileListContainer');
-            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
+            
+            if (!continuationToken) {
+                container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
+                storageFiles = []; // Reset files on first load
+            } else {
+                // Show loading spinner on "load more" button
+                const loadMoreBtn = document.getElementById('loadMoreBtn');
+                if (loadMoreBtn) {
+                    loadMoreBtn.innerHTML = '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin: 0 auto;"></div>';
+                    loadMoreBtn.disabled = true;
+                }
+            }
 
             try {
-                const response = await fetch('/api/files');
+                const url = continuationToken ? `/api/files?continuationToken=${continuationToken}` : '/api/files';
+                const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to fetch file list');
                 }
                 const data = await response.json();
-                storageFiles = data.files || [];
+                
+                // On first load, clear loading message
+                if (!continuationToken) {
+                    container.innerHTML = '';
+                }
+
+                // Remove existing "Load More" button container
+                const existingLoadMoreContainer = document.getElementById('loadMoreContainer');
+                if (existingLoadMoreContainer) {
+                    existingLoadMoreContainer.remove();
+                }
+                
+                storageFiles.push(...(data.files || []));
+                nextContinuationToken = data.nextContinuationToken;
 
                 if (storageFiles.length === 0) {
                     container.innerHTML = '<div class="empty-state"><p>No JSON files found in storage bucket</p></div>';
                     return;
                 }
-
-                container.innerHTML = storageFiles.map((file, index) => `
+                
+                const newFilesHtml = (data.files || []).map((file) => {
+                    const index = storageFiles.findIndex(f => f.key === file.key);
+                    return `
                     <div class="file-item" data-index="${index}" onclick="selectstorageFile(${index})">
                         <div class="file-item-content">
                             <div class="file-item-info">
@@ -851,9 +882,25 @@
                             </div>
                         </div>
                     </div>
-                `).join('');
+                `}).join('');
+
+                container.insertAdjacentHTML('beforeend', newFilesHtml);
+                
+                if (data.hasMore) {
+                    const loadMoreButton = `
+                        <div id="loadMoreContainer" style="text-align: center; padding: 1rem;">
+                            <button id="loadMoreBtn" class="upload-btn" onclick="loadstorageFileList('${nextContinuationToken}')">Load More</button>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', loadMoreButton);
+                }
+
             } catch (error) {
-                container.innerHTML = `<div class="error-message">Error loading files: ${escapeHtml(error.message)}</div>`;
+                if (!continuationToken) {
+                    container.innerHTML = `<div class="error-message">Error loading files: ${escapeHtml(error.message)}</div>`;
+                } else {
+                    swal('Error', `Error loading more files: ${error.message}`, 'error');
+                }
             }
         }
 
@@ -866,6 +913,12 @@
         function filterFileList() {
             const searchTerm = document.getElementById('fileSearchBox').value.toLowerCase();
             const container = document.getElementById('fileListContainer');
+
+            // When search is cleared, reload from scratch
+            if (!searchTerm.trim()) {
+                loadstorageFileList();
+                return;
+            }
 
             if (storageFiles.length === 0) {
                 return;
@@ -899,6 +952,9 @@
                     </div>
                 `;
             }).join('');
+
+            // After filtering, there's no "load more" because we are showing a subset of already loaded files.
+            // The user should clear the search to go back to the paginated list.
         }
 
         // Archive functions
