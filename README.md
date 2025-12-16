@@ -82,7 +82,7 @@ The server will start at `http://localhost:3000` (or the port specified in your 
 
 ### Using the Web Interface
 
-1. **Upload Local File**: Click "Upload Local File" or drag and drop a Trivy JSON report
+1. **Inspect Local File**: Click "Inspect Local File" or drag and drop a Trivy JSON report
 2. **Browse Storage Files**: Click "Browse storage Files" to view reports from your configured storage backend
 3. **Filter & Search**: Use severity filters and search box to find specific vulnerabilities
 4. **Archive Reports**: Archive processed reports to keep your active storage organized

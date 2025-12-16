@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔎</text></svg>">
     <title>Trivy Scan Visualizer</title>
+    <!-- SweetAlert v1 -->
+    <script src="https://unpkg.com/sweetalert@2.1.2/dist/sweetalert.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -100,72 +102,6 @@
             transform: translateY(0);
         }
 
-        .storage-btn {
-            background: #10b981;
-            color: white;
-            padding: 0.875rem 2rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            margin-left: 1rem;
-            transition: transform 0.2s ease;
-        }
-
-        .storage-btn:hover {
-            transform: translateY(-2px);
-            background: #059669;
-        }
-
-        .storage-btn:disabled {
-            background: #9ca3af;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 2rem;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            font-size: 1.5rem;
-        }
-
         .file-search-box {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -174,6 +110,7 @@
             font-size: 1rem;
             margin-bottom: 1rem;
             transition: border-color 0.2s ease;
+            box-sizing: border-box;
         }
 
         .file-search-box:focus {
@@ -181,25 +118,21 @@
             border-color: #667eea;
         }
 
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 0.5rem;
-            line-height: 1;
-        }
-
-        .modal-close:hover {
-            color: var(--text-primary);
-        }
-
         .file-list {
-            flex: 1;
             overflow-y: auto;
             border: 1px solid var(--border);
             border-radius: 8px;
+        }
+
+        .main-file-list {
+            max-height: 400px;
+            margin-bottom: 1.5rem;
+        }
+
+        .upload-local-section {
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
         }
 
         .file-item {
@@ -215,10 +148,6 @@
 
         .file-item:hover {
             background-color: #f3f4f6;
-        }
-
-        .file-item.selected {
-            background-color: #e0e7ff;
         }
 
         .file-name {
@@ -267,46 +196,98 @@
             transform: none;
         }
 
-        .modal-footer {
-            margin-top: 1.5rem;
-            display: flex;
-            justify-content: flex-end;
-            gap: 1rem;
+        .archive-btn.confirm {
+            background: #dc2626;
+            animation: pulse 0.5s ease-in-out infinite alternate;
         }
 
-        .modal-btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            font-size: 1rem;
+        .archive-btn.confirm:hover {
+            background: #b91c1c;
+        }
+
+        .download-btn {
+            background: #3b82f6;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
-        .modal-btn.cancel {
-            background: var(--bg-secondary);
-            border: 2px solid var(--border);
-            color: var(--text-primary);
+        .download-btn:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
         }
 
-        .modal-btn.cancel:hover {
-            border-color: #667eea;
-        }
-
-        .modal-btn.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            color: white;
-        }
-
-        .modal-btn.primary:hover {
-            transform: translateY(-2px);
-        }
-
-        .modal-btn.primary:disabled {
+        .download-btn:disabled {
             background: #9ca3af;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .file-item-buttons {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .dashboard-header .download-btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        .dashboard-buttons {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .upload-storage-btn {
+            background: #10b981;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            display: none;
+        }
+
+        .upload-storage-btn:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .upload-storage-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .upload-storage-btn.confirm {
+            background: #0d9488;
+            animation: pulse 0.5s ease-in-out infinite alternate;
+        }
+
+        .upload-storage-btn.confirm:hover {
+            background: #0f766e;
+        }
+
+        .dashboard-header .upload-storage-btn {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+        }
+
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
         }
 
         .empty-state {
@@ -717,32 +698,21 @@
         </header>
 
         <div id="uploadSection" class="upload-section">
-            <h2 style="margin-bottom: 1rem;">Load Trivy Report</h2>
-            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                Upload a local JSON file to view or select from storage bucket
-            </p>
-            <input type="file" id="fileInput" accept=".json">
-            <label for="fileInput" class="upload-btn">Upload Local File</label>
-            <button class="storage-btn" onclick="openstorageModal()">Browse storage Files</button>
-        </div>
-
-        <!-- storage File Selection Modal -->
-        <div id="storageModal" class="modal-overlay">
-            <div class="modal">
-                <div class="modal-header">
-                    <h2>Select Trivy Report from storage</h2>
-                    <button class="modal-close" onclick="closestorageModal()">&times;</button>
+            <h2 style="margin-bottom: 1rem;">Select Trivy Report</h2>
+            <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()">
+            <div id="fileListContainer" class="file-list main-file-list">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading files...</p>
                 </div>
-                <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()">
-                <div id="fileListContainer" class="file-list">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        <p>Loading files...</p>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="modal-btn cancel" onclick="closestorageModal()">Cancel</button>
-                    <button id="loadstorageFileBtn" class="modal-btn primary" onclick="loadSelectedstorageFile()" disabled>Load File</button>
+            </div>
+            <div class="upload-local-section">
+                <p style="color: var(--text-secondary); margin-bottom: 0.75rem;">Or work with a local file</p>
+                <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                    <input type="file" id="fileInput" accept=".json">
+                    <label for="fileInput" class="upload-btn">Inspect Local File</label>
+                    <input type="file" id="uploadFileInput" accept=".json">
+                    <label for="uploadFileInput" class="upload-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">Upload to Storage</label>
                 </div>
             </div>
         </div>
@@ -750,7 +720,11 @@
         <div id="dashboard" class="dashboard">
             <div class="dashboard-header">
                 <button class="back-btn" onclick="goBack()">← Back to File Selection</button>
-                <button id="dashboardArchiveBtn" class="archive-btn" onclick="archiveCurrentFile()">Archive</button>
+                <div class="dashboard-buttons">
+                    <button id="dashboardDownloadBtn" class="download-btn" onclick="downloadCurrentFile()" style="display: none;">Download</button>
+                    <button id="dashboardArchiveBtn" class="archive-btn" onclick="archiveCurrentFile()">Archive</button>
+                    <button id="dashboardUploadBtn" class="upload-storage-btn" onclick="uploadLocalFileToStorage()">Upload to Storage</button>
+                </div>
             </div>
             <div class="metadata-section">
                 <h2 style="margin-bottom: 1rem;">Scan Metadata</h2>
@@ -803,14 +777,24 @@
         let currentFilters = new Set(['ALL']);
         let showFixableOnly = false;
         let storageFiles = [];
-        let selectedstorageFile = null;
         let currentLoadedstorageFile = null;
+        let currentLocalFile = null; // { filename: string, content: object } - tracks locally opened files
 
-        // File upload handler
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MiB
+
+        // File upload handler (inspect locally)
         document.getElementById('fileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 loadLocalFile(file);
+            }
+        });
+
+        // Direct upload to storage handler
+        document.getElementById('uploadFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFileToStorage(file);
             }
         });
 
@@ -834,22 +818,7 @@
             }
         });
 
-        // storage Modal Functions
-        async function openstorageModal() {
-            const modal = document.getElementById('storageModal');
-            modal.classList.add('active');
-            selectedstorageFile = null;
-            document.getElementById('loadstorageFileBtn').disabled = true;
-            document.getElementById('fileSearchBox').value = '';
-            await loadstorageFileList();
-        }
-
-        function closestorageModal() {
-            const modal = document.getElementById('storageModal');
-            modal.classList.remove('active');
-            selectedstorageFile = null;
-        }
-
+        // Storage File List Functions
         async function loadstorageFileList() {
             const container = document.getElementById('fileListContainer');
             container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
@@ -876,7 +845,10 @@
                                     ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
                                 </div>
                             </div>
-                            <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                            <div class="file-item-buttons">
+                                <button class="download-btn" onclick="downloadFile(event, ${index})">Download</button>
+                                <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                            </div>
                         </div>
                     </div>
                 `).join('');
@@ -886,10 +858,9 @@
         }
 
         function selectstorageFile(index) {
-            document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
-            document.querySelector(`.file-item[data-index="${index}"]`).classList.add('selected');
-            selectedstorageFile = storageFiles[index];
-            document.getElementById('loadstorageFileBtn').disabled = false;
+            const file = storageFiles[index];
+            // Redirect to /files/{filename} URL
+            window.location.href = `/files/${file.name}`;
         }
 
         function filterFileList() {
@@ -900,7 +871,7 @@
                 return;
             }
 
-            const filteredFiles = storageFiles.filter((file, index) => {
+            const filteredFiles = storageFiles.filter((file) => {
                 return file.name.toLowerCase().includes(searchTerm);
             });
 
@@ -912,7 +883,7 @@
             container.innerHTML = filteredFiles.map((file) => {
                 const originalIndex = storageFiles.indexOf(file);
                 return `
-                    <div class="file-item${selectedstorageFile === file ? ' selected' : ''}" data-index="${originalIndex}" onclick="selectstorageFile(${originalIndex})">
+                    <div class="file-item" data-index="${originalIndex}" onclick="selectstorageFile(${originalIndex})">
                         <div class="file-item-content">
                             <div class="file-item-info">
                                 <div class="file-name">${escapeHtml(file.name)}</div>
@@ -920,108 +891,381 @@
                                     ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
                                 </div>
                             </div>
-                            <button class="archive-btn" onclick="archiveFile(event, ${originalIndex})">Archive</button>
+                            <div class="file-item-buttons">
+                                <button class="download-btn" onclick="downloadFile(event, ${originalIndex})">Download</button>
+                                <button class="archive-btn" onclick="archiveFile(event, ${originalIndex})">Archive</button>
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
         }
 
-        function loadSelectedstorageFile() {
-            if (!selectedstorageFile) return;
-
-            // Redirect to /files/{filename} URL
-            window.location.href = `/files/${selectedstorageFile.name}`;
-        }
-
         // Archive functions
+        const archiveConfirmTimers = new Map();
+
         async function archiveFile(event, index) {
             event.stopPropagation();
             const file = storageFiles[index];
-            if (!confirm(`Are you sure you want to archive "${file.name}"?`)) {
-                return;
-            }
-
             const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = 'Archiving...';
+            const btnKey = `list-${index}`;
 
-            try {
-                const response = await fetch('/api/files/archive', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: file.key })
-                });
+            // Check if in confirm state
+            if (btn.classList.contains('confirm')) {
+                // Clear the timer and proceed with archive
+                clearTimeout(archiveConfirmTimers.get(btnKey));
+                archiveConfirmTimers.delete(btnKey);
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to archive file');
+                btn.classList.remove('confirm');
+                btn.disabled = true;
+                btn.textContent = 'Archiving...';
+
+                try {
+                    const response = await fetch('/api/files/archive', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: file.key })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to archive file');
+                    }
+
+                    await loadstorageFileList();
+                } catch (error) {
+                    swal('Error', 'Error archiving file: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Archive';
                 }
+            } else {
+                // Enter confirm state
+                btn.classList.add('confirm');
+                btn.textContent = 'Yes';
 
-                await loadstorageFileList();
-            } catch (error) {
-                alert('Error archiving file: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Archive';
+                // Set timer to revert after 3 seconds
+                const timer = setTimeout(() => {
+                    btn.classList.remove('confirm');
+                    btn.textContent = 'Archive';
+                    archiveConfirmTimers.delete(btnKey);
+                }, 3000);
+
+                archiveConfirmTimers.set(btnKey, timer);
             }
         }
 
         async function archiveCurrentFile() {
             if (!currentLoadedstorageFile) {
-                alert('No storage file is currently loaded');
-                return;
-            }
-
-            if (!confirm(`Are you sure you want to archive "${currentLoadedstorageFile.name}"?`)) {
+                swal('Warning', 'No storage file is currently loaded', 'warning');
                 return;
             }
 
             const btn = document.getElementById('dashboardArchiveBtn');
-            btn.disabled = true;
-            btn.textContent = 'Archiving...';
+            const btnKey = 'dashboard';
 
-            try {
-                const response = await fetch('/api/files/archive', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: currentLoadedstorageFile.key })
-                });
+            // Check if in confirm state
+            if (btn.classList.contains('confirm')) {
+                // Clear the timer and proceed with archive
+                clearTimeout(archiveConfirmTimers.get(btnKey));
+                archiveConfirmTimers.delete(btnKey);
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to archive file');
+                btn.classList.remove('confirm');
+                btn.disabled = true;
+                btn.textContent = 'Archiving...';
+
+                try {
+                    const response = await fetch('/api/files/archive', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: currentLoadedstorageFile.key })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to archive file');
+                    }
+                    currentLoadedstorageFile = null;
+                    goBack();
+                } catch (error) {
+                    swal('Error', 'Error archiving file: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Archive';
                 }
+            } else {
+                // Enter confirm state
+                btn.classList.add('confirm');
+                btn.textContent = 'Yes';
 
-                alert('File archived successfully');
-                currentLoadedstorageFile = null;
-                goBack();
-            } catch (error) {
-                alert('Error archiving file: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Archive';
+                // Set timer to revert after 3 seconds
+                const timer = setTimeout(() => {
+                    btn.classList.remove('confirm');
+                    btn.textContent = 'Archive';
+                    archiveConfirmTimers.delete(btnKey);
+                }, 3000);
+
+                archiveConfirmTimers.set(btnKey, timer);
             }
         }
 
-        function updateDashboardArchiveButton() {
-            const btn = document.getElementById('dashboardArchiveBtn');
+        function updateDashboardButtons() {
+            const archiveBtn = document.getElementById('dashboardArchiveBtn');
+            const uploadBtn = document.getElementById('dashboardUploadBtn');
+            const downloadBtn = document.getElementById('dashboardDownloadBtn');
+
             if (currentLoadedstorageFile) {
-                btn.style.display = 'block';
+                // Remote file loaded - show Archive and Download buttons, hide Upload button
+                archiveBtn.style.display = 'block';
+                downloadBtn.style.display = 'block';
+                uploadBtn.style.display = 'none';
+            } else if (currentLocalFile) {
+                // Local file loaded - hide Archive and Download buttons, show Upload button
+                archiveBtn.style.display = 'none';
+                downloadBtn.style.display = 'none';
+                uploadBtn.style.display = 'block';
             } else {
-                btn.style.display = 'none';
+                // No file loaded - hide all
+                archiveBtn.style.display = 'none';
+                downloadBtn.style.display = 'none';
+                uploadBtn.style.display = 'none';
             }
+        }
+
+        // Download functions
+        async function downloadFile(event, index) {
+            event.stopPropagation();
+            const file = storageFiles[index];
+            const btn = event.target;
+
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Downloading...';
+
+            try {
+                const response = await fetch(`/api/files/${encodeURIComponent(file.name)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch file');
+                }
+                const data = await response.json();
+
+                // Create blob and trigger download
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                btn.textContent = originalText;
+                btn.disabled = false;
+            } catch (error) {
+                swal('Error', 'Error downloading file: ' + error.message, 'error');
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function downloadCurrentFile() {
+            if (!currentLoadedstorageFile) {
+                swal('Warning', 'No storage file is currently loaded', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('dashboardDownloadBtn');
+            btn.disabled = true;
+            const originalText = btn.textContent;
+            btn.textContent = 'Downloading...';
+
+            try {
+                const response = await fetch(`/api/files/${encodeURIComponent(currentLoadedstorageFile.name)}`);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch file');
+                }
+                const data = await response.json();
+
+                // Create blob and trigger download
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = currentLoadedstorageFile.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                btn.textContent = originalText;
+                btn.disabled = false;
+            } catch (error) {
+                swal('Error', 'Error downloading file: ' + error.message, 'error');
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Legacy alias for compatibility
+        function updateDashboardArchiveButton() {
+            updateDashboardButtons();
+        }
+
+        async function uploadLocalFileToStorage() {
+            if (!currentLocalFile) {
+                swal('Warning', 'No local file is currently loaded', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('dashboardUploadBtn');
+            const btnKey = 'upload';
+
+            // Check if in confirm state
+            if (btn.classList.contains('confirm')) {
+                // Clear the timer and proceed with upload
+                clearTimeout(archiveConfirmTimers.get(btnKey));
+                archiveConfirmTimers.delete(btnKey);
+
+                btn.classList.remove('confirm');
+                btn.disabled = true;
+                btn.textContent = 'Uploading...';
+
+                try {
+                    const response = await fetch('/api/files/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: currentLocalFile.filename,
+                            content: currentLocalFile.content
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to upload file');
+                    }
+
+                    const result = await response.json();
+                    swal('Success', 'File uploaded successfully: ' + result.filename, 'success').then(() => {
+                        // Navigate to the uploaded file after user acknowledges
+                        window.location.href = `/files/${encodeURIComponent(result.filename)}`;
+                    });
+                } catch (error) {
+                    swal('Error', 'Error uploading file: ' + error.message, 'error');
+                    btn.disabled = false;
+                    btn.textContent = 'Upload to Storage';
+                }
+            } else {
+                // Enter confirm state
+                btn.classList.add('confirm');
+                btn.textContent = 'Confirm Upload';
+
+                // Set timer to revert after 3 seconds
+                const timer = setTimeout(() => {
+                    btn.classList.remove('confirm');
+                    btn.textContent = 'Upload to Storage';
+                    archiveConfirmTimers.delete(btnKey);
+                }, 3000);
+
+                archiveConfirmTimers.set(btnKey, timer);
+            }
+        }
+
+        // Direct upload file to storage with validation
+        async function uploadFileToStorage(file) {
+            const uploadSection = document.getElementById('uploadSection');
+
+            // Create status display
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'loading';
+            statusDiv.innerHTML = '<div class="spinner"></div><p>Validating file...</p>';
+            uploadSection.appendChild(statusDiv);
+
+            const showError = (message) => {
+                statusDiv.remove();
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = message;
+                uploadSection.insertBefore(errorDiv, uploadSection.firstChild);
+                setTimeout(() => errorDiv.remove(), 5000);
+                // Reset the file input
+                document.getElementById('uploadFileInput').value = '';
+            };
+
+            // 1. Check file size (max 10 MiB)
+            if (file.size > MAX_FILE_SIZE) {
+                showError(`Error: File size (${formatBytes(file.size)}) exceeds 10 MiB limit.`);
+                return;
+            }
+
+            // 2. Read and validate JSON
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                let data;
+                try {
+                    data = JSON.parse(e.target.result);
+                } catch (parseError) {
+                    showError('Error: Invalid JSON file. ' + parseError.message);
+                    return;
+                }
+
+                // 3. Validate Trivy report structure
+                if (!data.Results || !Array.isArray(data.Results)) {
+                    showError('Error: Invalid Trivy report format. File must contain a Results array.');
+                    return;
+                }
+
+                // 4. Verify it can be visualized (has proper vulnerability data)
+                let hasValidStructure = true;
+                for (const result of data.Results) {
+                    if (result.Vulnerabilities && !Array.isArray(result.Vulnerabilities)) {
+                        hasValidStructure = false;
+                        break;
+                    }
+                }
+                if (!hasValidStructure) {
+                    showError('Error: Invalid Trivy report structure. Vulnerabilities must be an array.');
+                    return;
+                }
+
+                // All validations passed, proceed with upload
+                statusDiv.innerHTML = '<div class="spinner"></div><p>Uploading to storage...</p>';
+
+                try {
+                    const response = await fetch('/api/files/upload', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            filename: file.name,
+                            content: data
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to upload file');
+                    }
+
+                    const result = await response.json();
+                    statusDiv.remove();
+
+                    // Navigate to the uploaded file
+                    window.location.href = `/files/${encodeURIComponent(result.filename)}`;
+                } catch (uploadError) {
+                    showError('Error uploading file: ' + uploadError.message);
+                }
+            };
+
+            reader.onerror = function() {
+                showError('Error reading file.');
+            };
+
+            reader.readAsText(file);
         }
 
         // Go back to file selection
         function goBack() {
-            document.getElementById('uploadSection').style.display = 'block';
-            document.getElementById('dashboard').classList.remove('active');
-            document.getElementById('fileInput').value = '';
-            trivyData = null;
-            allVulnerabilities = [];
-            currentFilters = new Set(['ALL']);
-            showFixableOnly = false;
-            document.getElementById('fixableToggle').classList.remove('active');
-            currentLoadedstorageFile = null;
+            // Navigate back to home page
+            window.location.href = '/';
         }
 
         function loadLocalFile(file) {
@@ -1036,8 +1280,13 @@
                     const data = JSON.parse(e.target.result);
                     uploadSection.removeChild(loadingDiv);
                     currentLoadedstorageFile = null;
+                    // Store local file info for potential upload
+                    currentLocalFile = {
+                        filename: file.name,
+                        content: data
+                    };
                     processData(data);
-                    updateDashboardArchiveButton();
+                    updateDashboardButtons();
                 } catch (error) {
                     uploadSection.removeChild(loadingDiv);
                     const errorDiv = document.createElement('div');
@@ -1307,7 +1556,7 @@
         // Auto-load file from URL path /files/{filename}
         async function loadFileFromUrl() {
             const pathMatch = window.location.pathname.match(/^\/files\/(.+)$/);
-            if (!pathMatch) return;
+            if (!pathMatch) return false;
 
             const filename = decodeURIComponent(pathMatch[1]);
             const uploadSection = document.getElementById('uploadSection');
@@ -1326,31 +1575,30 @@
                 }
                 const data = await response.json();
                 currentLoadedstorageFile = { name: filename, key: filename };
+                currentLocalFile = null; // Clear local file since we're loading from storage
                 processData(data);
-                updateDashboardArchiveButton();
+                updateDashboardButtons();
+                return true;
             } catch (error) {
-                uploadSection.innerHTML = `
-                    <div class="error-message">Error loading file: ${escapeHtml(error.message)}</div>
-                    <h2 style="margin-bottom: 1rem; margin-top: 1rem;">Load Trivy Report</h2>
-                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
-                        Upload a local JSON file to view or select from storage bucket
-                    </p>
-                    <input type="file" id="fileInput" accept=".json">
-                    <label for="fileInput" class="upload-btn">Upload Local File</label>
-                    <button class="storage-btn" onclick="openstorageModal()">Browse storage Files</button>
-                `;
-                // Re-attach file input listener
-                document.getElementById('fileInput').addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        loadLocalFile(file);
-                    }
-                });
+                // Redirect to home page on error
+                window.location.href = '/';
+                return false;
             }
         }
 
-        // Check for file in URL on page load
-        loadFileFromUrl();
+        // Initialize page
+        async function init() {
+            const pathMatch = window.location.pathname.match(/^\/files\/(.+)$/);
+            if (pathMatch) {
+                // If URL has a file path, load that file
+                await loadFileFromUrl();
+            } else {
+                // Otherwise, load the file list on the main page
+                await loadstorageFileList();
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>

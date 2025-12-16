@@ -16,7 +16,18 @@ const STORAGE_PREFIX = process.env.STORAGE_PREFIX || '';
 const storageProvider = createStorageProvider(STORAGE_LOCATION, STORAGE_PREFIX);
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '11mb' })); // 10 MiB + buffer for JSON overhead
+
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`);
+  });
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
@@ -40,18 +51,59 @@ app.get('/api/files', async (req, res) => {
   }
 });
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MiB
+
+// Upload a file to active path
+app.post('/api/files/upload', async (req, res) => {
+  try {
+    const { filename, content } = req.body;
+
+    if (!filename || !content) {
+      return res.status(400).json({ error: 'Filename and content are required' });
+    }
+
+    // Validate filename
+    if (!/^[\w\-. ]+\.json$/i.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename. Must be a .json file with alphanumeric characters, dashes, underscores, dots, or spaces.' });
+    }
+
+    // Validate content size (approximate check - already limited by express.json middleware)
+    const contentStr = JSON.stringify(content);
+    if (Buffer.byteLength(contentStr, 'utf8') > MAX_FILE_SIZE) {
+      return res.status(400).json({ error: 'File content exceeds 10 MiB limit' });
+    }
+
+    // Validate Trivy report structure
+    if (!content.Results || !Array.isArray(content.Results)) {
+      return res.status(400).json({ error: 'Invalid Trivy report format. Must contain Results array.' });
+    }
+
+    // Save file
+    const result = await storageProvider.saveFile(filename, content);
+
+    res.json({
+      message: 'File uploaded successfully',
+      filename: result.filename,
+      key: result.key
+    });
+  } catch (error) {
+    console.error('Error uploading file:', error);
+    res.status(500).json({ error: 'Failed to upload file', details: error.message });
+  }
+});
+
 // Archive a file (move from active to archived)
 app.post('/api/files/archive', async (req, res) => {
   try {
-    const { key } = req.body;
+    var { key } = req.body;
 
     if (!key) {
       return res.status(400).json({ error: 'File key is required' });
     }
-
+    console.log(key)
     // Verify the file is in the active path
     if (!key.startsWith(storageProvider.activePath)) {
-      return res.status(400).json({ error: 'File is not in the active path' });
+      key = path.join(storageProvider.activePath, key)
     }
 
     const filename = path.basename(key);

@@ -56,7 +56,7 @@ class FilesystemStorageProvider {
   }
 
   async getFile(key) {
-    const filePath = path.resolve(key);
+    const filePath = path.join(this.basePath, key);
     const content = await fs.readFile(filePath, 'utf-8');
     return JSON.parse(content);
   }
@@ -73,6 +73,18 @@ class FilesystemStorageProvider {
   async deleteFile(key) {
     const filePath = path.resolve(key);
     await fs.unlink(filePath);
+  }
+
+  async saveFile(filename, content) {
+    const filePath = path.join(this.activePath, filename);
+
+    // Ensure active directory exists
+    await fs.mkdir(this.activePath, { recursive: true });
+
+    // Write file
+    await fs.writeFile(filePath, JSON.stringify(content, null, 2), 'utf-8');
+
+    return { key: filePath, filename };
   }
 }
 

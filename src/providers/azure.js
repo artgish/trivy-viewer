@@ -86,6 +86,16 @@ class AzureStorageProvider {
       readableStream.on('error', reject);
     });
   }
+
+  async saveFile(filename, content) {
+    const key = `${this.activePath}/${filename}`;
+    const blockBlobClient = this.containerClient.getBlockBlobClient(key);
+    const data = JSON.stringify(content, null, 2);
+    await blockBlobClient.upload(data, data.length, {
+      blobHTTPHeaders: { blobContentType: 'application/json' }
+    });
+    return { key, filename };
+  }
 }
 
 module.exports = AzureStorageProvider;

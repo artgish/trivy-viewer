@@ -1,4 +1,4 @@
-const { S3Client, ListObjectsV2Command, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, ListObjectsV2Command, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 
 async function streamToString(stream) {
@@ -70,6 +70,18 @@ class S3StorageProvider {
       Key: key
     });
     await this.client.send(command);
+  }
+
+  async saveFile(filename, content) {
+    const key = `${this.activePath}/${filename}`;
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: JSON.stringify(content, null, 2),
+      ContentType: 'application/json'
+    });
+    await this.client.send(command);
+    return { key, filename };
   }
 }
 

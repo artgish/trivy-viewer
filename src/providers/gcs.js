@@ -58,6 +58,15 @@ class GCSStorageProvider {
     const file = this.bucket.file(key);
     await file.delete();
   }
+
+  async saveFile(filename, content) {
+    const key = `${this.activePath}/${filename}`;
+    const file = this.bucket.file(key);
+    await file.save(JSON.stringify(content, null, 2), {
+      contentType: 'application/json'
+    });
+    return { key, filename };
+  }
 }
 
 module.exports = GCSStorageProvider;
