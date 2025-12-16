@@ -1413,7 +1413,7 @@
 
         function renderStats() {
             const stats = {
-                total: allVulnerabilities.length,
+                total: 0,
                 CRITICAL: 0,
                 HIGH: 0,
                 MEDIUM: 0,
@@ -1421,7 +1421,13 @@
                 UNKNOWN: 0
             };
 
-            allVulnerabilities.forEach(vuln => {
+            // Filter vulnerabilities based on fixable toggle
+            const vulnsToCount = showFixableOnly
+                ? allVulnerabilities.filter(vuln => vuln.FixedVersion)
+                : allVulnerabilities;
+
+            stats.total = vulnsToCount.length;
+            vulnsToCount.forEach(vuln => {
                 const severity = vuln.Severity || 'UNKNOWN';
                 stats[severity] = (stats[severity] || 0) + 1;
             });
@@ -1581,6 +1587,7 @@
             showFixableOnly = !showFixableOnly;
             const toggle = document.getElementById('fixableToggle');
             toggle.classList.toggle('active', showFixableOnly);
+            renderStats();
             renderTable();
         }
 
