@@ -927,29 +927,11 @@
             }).join('');
         }
 
-        async function loadSelectedstorageFile() {
+        function loadSelectedstorageFile() {
             if (!selectedstorageFile) return;
 
-            const btn = document.getElementById('loadstorageFileBtn');
-            btn.disabled = true;
-            btn.textContent = 'Loading...';
-
-            try {
-                const response = await fetch(`/api/files/${encodeURIComponent(selectedstorageFile.key)}`);
-                if (!response.ok) {
-                    throw new Error('Failed to load file');
-                }
-                const data = await response.json();
-                currentLoadedstorageFile = selectedstorageFile;
-                closestorageModal();
-                processData(data);
-                updateDashboardArchiveButton();
-            } catch (error) {
-                alert('Error loading file: ' + error.message);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Load File';
-            }
+            // Redirect to /files/{filename} URL
+            window.location.href = `/files/${selectedstorageFile.name}`;
         }
 
         // Archive functions
