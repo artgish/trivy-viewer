@@ -700,8 +700,9 @@
         <div id="uploadSection" class="upload-section">
             <h2 style="margin-bottom: 1rem;">Select Trivy Report</h2>
             <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="filterFileList()" style="margin-bottom: 0;">
+                <input type="text" id="fileSearchBox" class="file-search-box" placeholder="Search files..." oninput="handleFileSearchInput()" style="margin-bottom: 0;">
                 <button class="upload-btn" onclick="loadstorageFileList()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Refresh</button>
+                <button id="openFileButton" class="upload-btn" style="padding: 0.75rem 1.5rem; white-space: nowrap; display: none;" onclick="openSelectedFile()">Open</button>
             </div>
             <div id="fileListContainer" class="file-list main-file-list">
                 <div class="loading">
@@ -1642,6 +1643,25 @@
             }
         }
 
+        function openSelectedFile() {
+            const filename = document.getElementById('fileSearchBox').value;
+            if (filename.trim() !== '') {
+                window.location.href = `/files/${encodeURIComponent(filename)}`;
+            }
+        }
+
+        function handleFileSearchInput() {
+            const searchTerm = document.getElementById('fileSearchBox').value;
+            const openButton = document.getElementById('openFileButton');
+
+            if (searchTerm.trim() !== '') {
+                openButton.style.display = 'block';
+            } else {
+                openButton.style.display = 'none';
+            }
+            filterFileList(); // Still call the existing filter function
+        }
+        
         // Initialize page
         async function init() {
             const pathMatch = window.location.pathname.match(/^\/files\/(.+)$/);
