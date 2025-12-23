@@ -18,27 +18,48 @@ class S3StorageProvider {
     this.archivedPath = `${prefix}/archived`.replace(/^\//, '');
   }
 
-  async listFiles(subPath, limit = 1000, continuationToken = undefined) {
+  async listFiles(subPath, limit = 100, continuationToken = undefined) {
+    // Ensure subPath ends with / for proper delimiter behavior
+    const prefix = subPath.endsWith('/') ? subPath : `${subPath}/`;
+
     const command = new ListObjectsV2Command({
       Bucket: this.bucket,
-      Prefix: subPath,
+      Prefix: prefix,
+      Delimiter: '/',
       MaxKeys: limit,
       ContinuationToken: continuationToken || undefined
     });
 
     const response = await this.client.send(command);
 
+    // Extract directories (CommonPrefixes)
+    const directories = (response.CommonPrefixes || []).map(prefix => {
+      const dirPath = prefix.Prefix;
+      // Get the directory name (last segment before trailing /)
+      const name = dirPath.slice(0, -1).split('/').pop();
+      return {
+        key: dirPath,
+        name: name,
+        type: 'directory'
+      };
+    });
+
+    // Extract files
     const files = (response.Contents || [])
-      .filter(obj => obj.Key.endsWith('.json'))
+      .filter(obj => obj.Key.endsWith('.json') && obj.Key !== prefix)
       .map(obj => ({
         key: obj.Key,
         name: path.basename(obj.Key),
         size: obj.Size,
-        lastModified: obj.LastModified
+        lastModified: obj.LastModified,
+        type: 'file'
       }));
 
+    // Combine directories first, then files
+    const items = [...directories, ...files];
+
     return {
-      files,
+      files: items,
       nextContinuationToken: response.NextContinuationToken || null,
       hasMore: response.IsTruncated || false
     };

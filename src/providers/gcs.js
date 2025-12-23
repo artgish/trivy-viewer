@@ -14,29 +14,48 @@ class GCSStorageProvider {
     this.archivedPath = prefix ? `${prefix}/archived` : 'archived';
   }
 
-  async listFiles(subPath, limit = 1000, continuationToken = undefined) {
+  async listFiles(subPath, limit = 100, continuationToken = undefined) {
+    const prefix = subPath.endsWith('/') ? subPath : `${subPath}/`;
+
     const options = {
-      prefix: subPath.endsWith('/') ? subPath : `${subPath}/`,
-      maxResults: limit
+      prefix: prefix,
+      delimiter: '/',
+      maxResults: limit,
+      autoPaginate: false
     };
 
     if (continuationToken) {
       options.pageToken = continuationToken;
     }
 
-    const [files, nextQuery] = await this.bucket.getFiles(options);
+    const [files, nextQuery, apiResponse] = await this.bucket.getFiles(options);
 
+    // Extract directories from prefixes
+    const directories = (apiResponse.prefixes || []).map(dirPath => {
+      const name = dirPath.slice(0, -1).split('/').pop();
+      return {
+        key: dirPath,
+        name: name,
+        type: 'directory'
+      };
+    });
+
+    // Extract JSON files
     const jsonFiles = files
-      .filter(file => file.name.endsWith('.json'))
+      .filter(file => file.name.endsWith('.json') && file.name !== prefix)
       .map(file => ({
         key: file.name,
         name: path.basename(file.name),
         size: parseInt(file.metadata.size, 10),
-        lastModified: new Date(file.metadata.updated)
+        lastModified: new Date(file.metadata.updated),
+        type: 'file'
       }));
 
+    // Combine directories first, then files
+    const items = [...directories, ...jsonFiles];
+
     return {
-      files: jsonFiles,
+      files: items,
       nextContinuationToken: nextQuery?.pageToken || null,
       hasMore: !!nextQuery?.pageToken
     };

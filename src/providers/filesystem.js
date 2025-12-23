@@ -10,7 +10,7 @@ class FilesystemStorageProvider {
     this.archivedPath = path.join(prefixPath, 'archived');
   }
 
-  async listFiles(subPath, limit = 1000, continuationToken = undefined) {
+  async listFiles(subPath, limit = 100, continuationToken = undefined) {
     const dirPath = path.resolve(subPath);
 
     try {
@@ -25,6 +25,19 @@ class FilesystemStorageProvider {
 
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
+    // Collect directories
+    const directories = [];
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        directories.push({
+          key: path.join(dirPath, entry.name) + '/',
+          name: entry.name,
+          type: 'directory'
+        });
+      }
+    }
+
+    // Collect JSON files
     let allFiles = [];
     for (const entry of entries) {
       if (entry.isFile() && entry.name.endsWith('.json')) {
@@ -34,22 +47,27 @@ class FilesystemStorageProvider {
           key: filePath,
           name: entry.name,
           size: stats.size,
-          lastModified: stats.mtime
+          lastModified: stats.mtime,
+          type: 'file'
         });
       }
     }
 
-    // Sort by lastModified descending
+    // Sort files by lastModified descending
     allFiles.sort((a, b) => b.lastModified - a.lastModified);
+
+    // Combine: directories first (sorted by name), then files
+    directories.sort((a, b) => a.name.localeCompare(b.name));
+    const allItems = [...directories, ...allFiles];
 
     // Handle pagination using offset-based continuation token
     const startIndex = continuationToken ? parseInt(continuationToken, 10) : 0;
     const endIndex = startIndex + limit;
-    const paginatedFiles = allFiles.slice(startIndex, endIndex);
-    const hasMore = endIndex < allFiles.length;
+    const paginatedItems = allItems.slice(startIndex, endIndex);
+    const hasMore = endIndex < allItems.length;
 
     return {
-      files: paginatedFiles,
+      files: paginatedItems,
       nextContinuationToken: hasMore ? String(endIndex) : null,
       hasMore
     };

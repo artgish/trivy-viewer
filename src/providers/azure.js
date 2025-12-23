@@ -16,16 +16,17 @@ class AzureStorageProvider {
     this.archivedPath = prefix ? `${prefix}/archived` : 'archived';
   }
 
-  async listFiles(subPath, limit = 1000, continuationToken = undefined) {
+  async listFiles(subPath, limit = 100, continuationToken = undefined) {
+    const prefix = subPath.endsWith('/') ? subPath : `${subPath}/`;
     const files = [];
+    const directories = new Set();
     let hasMore = false;
     let nextToken = null;
 
-    const options = {
-      prefix: subPath.endsWith('/') ? subPath : `${subPath}/`
-    };
-
-    const iterator = this.containerClient.listBlobsFlat(options).byPage({
+    // Azure doesn't have native delimiter support like S3/GCS, so we use listBlobsByHierarchy
+    const iterator = this.containerClient.listBlobsByHierarchy('/', {
+      prefix: prefix
+    }).byPage({
       maxPageSize: limit,
       continuationToken: continuationToken || undefined
     });
@@ -33,13 +34,25 @@ class AzureStorageProvider {
     const response = await iterator.next();
 
     if (!response.done && response.value.segment) {
-      for (const blob of response.value.segment.blobItems) {
+      // Process virtual directories (prefixes)
+      for (const prefix of (response.value.segment.blobPrefixes || [])) {
+        const name = prefix.name.slice(0, -1).split('/').pop();
+        directories.add(JSON.stringify({
+          key: prefix.name,
+          name: name,
+          type: 'directory'
+        }));
+      }
+
+      // Process files
+      for (const blob of (response.value.segment.blobItems || [])) {
         if (blob.name.endsWith('.json')) {
           files.push({
             key: blob.name,
             name: path.basename(blob.name),
             size: blob.properties.contentLength,
-            lastModified: blob.properties.lastModified
+            lastModified: blob.properties.lastModified,
+            type: 'file'
           });
         }
       }
@@ -47,8 +60,12 @@ class AzureStorageProvider {
       hasMore = !!nextToken;
     }
 
+    // Combine directories first, then files
+    const dirArray = Array.from(directories).map(d => JSON.parse(d));
+    const items = [...dirArray, ...files];
+
     return {
-      files,
+      files: items,
       nextContinuationToken: nextToken,
       hasMore
     };

@@ -235,6 +235,53 @@
             align-items: center;
         }
 
+        .directory-item {
+            background-color: #fefce8;
+        }
+
+        .directory-item:hover {
+            background-color: #fef9c3;
+        }
+
+        .directory-icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem 0;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            flex-wrap: wrap;
+        }
+
+        .breadcrumb-item {
+            color: #667eea;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            transition: background-color 0.2s ease;
+        }
+
+        .breadcrumb-item:hover {
+            background-color: #f3f4f6;
+            text-decoration: underline;
+        }
+
+        .breadcrumb-separator {
+            color: var(--text-secondary);
+        }
+
+        .breadcrumb-current {
+            color: var(--text-primary);
+            font-weight: 600;
+            padding: 0.25rem 0.5rem;
+        }
+
         .dashboard-header .download-btn {
             padding: 0.75rem 1.5rem;
             font-size: 1rem;
@@ -704,6 +751,7 @@
                 <button class="upload-btn" onclick="loadstorageFileList()" style="padding: 0.75rem 1.5rem; white-space: nowrap;">Refresh</button>
                 <button id="openFileButton" class="upload-btn" style="padding: 0.75rem 1.5rem; white-space: nowrap; display: none;" onclick="openSelectedFile()">Open</button>
             </div>
+            <div id="breadcrumbContainer" class="breadcrumb" style="display: none;"></div>
             <div id="fileListContainer" class="file-list main-file-list">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -784,6 +832,7 @@
         let nextContinuationToken = null;
         let currentLoadedstorageFile = null;
         let currentLocalFile = null; // { filename: string, content: object } - tracks locally opened files
+        let currentPath = ''; // Current directory path for recursive navigation
 
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MiB
 
@@ -824,9 +873,16 @@
         });
 
         // Storage File List Functions
-        async function loadstorageFileList(continuationToken) {
+        async function loadstorageFileList(continuationToken, newPath) {
             const container = document.getElementById('fileListContainer');
-            
+            const breadcrumbContainer = document.getElementById('breadcrumbContainer');
+
+            // If newPath is provided, we're navigating to a new directory
+            if (newPath !== undefined) {
+                currentPath = newPath;
+                continuationToken = null; // Reset pagination for new directory
+            }
+
             if (!continuationToken) {
                 container.innerHTML = '<div class="loading"><div class="spinner"></div><p>Loading files...</p></div>';
                 storageFiles = []; // Reset files on first load
@@ -840,13 +896,21 @@
             }
 
             try {
-                const url = continuationToken ? `/api/files?continuationToken=${continuationToken}` : '/api/files';
+                let url = '/api/files';
+                const params = new URLSearchParams();
+                if (currentPath) params.set('path', currentPath);
+                if (continuationToken) params.set('continuationToken', continuationToken);
+                if (params.toString()) url += '?' + params.toString();
+
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error('Failed to fetch file list');
                 }
                 const data = await response.json();
-                
+
+                // Update breadcrumb navigation
+                updateBreadcrumb(data.currentPath || '');
+
                 // On first load, clear loading message
                 if (!continuationToken) {
                     container.innerHTML = '';
@@ -857,40 +921,55 @@
                 if (existingLoadMoreContainer) {
                     existingLoadMoreContainer.remove();
                 }
-                
+
                 storageFiles.push(...(data.files || []));
                 nextContinuationToken = data.nextContinuationToken;
 
                 if (storageFiles.length === 0) {
-                    container.innerHTML = '<div class="empty-state"><p>No JSON files found in storage bucket</p></div>';
+                    container.innerHTML = '<div class="empty-state"><p>No files or directories found</p></div>';
                     return;
                 }
-                
+
                 const newFilesHtml = (data.files || []).map((file) => {
                     const index = storageFiles.findIndex(f => f.key === file.key);
-                    return `
-                    <div class="file-item" data-index="${index}" onclick="selectstorageFile(${index})">
-                        <div class="file-item-content">
-                            <div class="file-item-info">
-                                <div class="file-name">${escapeHtml(file.name)}</div>
-                                <div class="file-meta">
-                                    ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                    if (file.type === 'directory') {
+                        return `
+                        <div class="file-item directory-item" data-index="${index}" onclick="navigateToDirectory('${escapeHtml(file.name)}')">
+                            <div class="file-item-content">
+                                <div class="file-item-info">
+                                    <div class="file-name"><span class="directory-icon">📁</span>${escapeHtml(file.name)}</div>
+                                    <div class="file-meta">Directory</div>
                                 </div>
                             </div>
-                            <div class="file-item-buttons">
-                                <button class="download-btn" onclick="downloadFile(event, ${index})">Download</button>
-                                <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                        </div>
+                    `;
+                    } else {
+                        return `
+                        <div class="file-item" data-index="${index}" onclick="selectstorageFile(${index})">
+                            <div class="file-item-content">
+                                <div class="file-item-info">
+                                    <div class="file-name">${escapeHtml(file.name)}</div>
+                                    <div class="file-meta">
+                                        ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                                    </div>
+                                </div>
+                                <div class="file-item-buttons">
+                                    <button class="download-btn" onclick="downloadFile(event, ${index})">Download</button>
+                                    <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `}).join('');
+                    `;
+                    }
+                }).join('');
 
                 container.insertAdjacentHTML('beforeend', newFilesHtml);
-                
+
                 if (data.hasMore) {
                     const loadMoreButton = `
-                        <div id="loadMoreContainer" style="text-align: center; padding: 1rem;">
+                        <div id="loadMoreContainer" style="text-align: center; padding: 1rem; display: flex; gap: 1rem; justify-content: center;">
                             <button id="loadMoreBtn" class="upload-btn" onclick="loadstorageFileList('${nextContinuationToken}')">Load More</button>
+                            <button id="loadAllBtn" class="upload-btn" onclick="loadAllFiles()">Load All</button>
                         </div>
                     `;
                     container.insertAdjacentHTML('beforeend', loadMoreButton);
@@ -905,10 +984,136 @@
             }
         }
 
+        function updateBreadcrumb(path) {
+            const breadcrumbContainer = document.getElementById('breadcrumbContainer');
+
+            if (!path) {
+                breadcrumbContainer.style.display = 'none';
+                return;
+            }
+
+            breadcrumbContainer.style.display = 'flex';
+            const parts = path.split('/').filter(p => p);
+
+            let html = '<span class="breadcrumb-item" onclick="navigateToDirectory(\'\', true)">Root</span>';
+
+            let accumulatedPath = '';
+            parts.forEach((part, idx) => {
+                accumulatedPath += (accumulatedPath ? '/' : '') + part;
+                html += '<span class="breadcrumb-separator">/</span>';
+                if (idx === parts.length - 1) {
+                    html += `<span class="breadcrumb-current">${escapeHtml(part)}</span>`;
+                } else {
+                    const pathForClick = accumulatedPath;
+                    html += `<span class="breadcrumb-item" onclick="navigateToDirectory('${escapeHtml(pathForClick)}', true)">${escapeHtml(part)}</span>`;
+                }
+            });
+
+            breadcrumbContainer.innerHTML = html;
+        }
+
+        function navigateToDirectory(dirName, isAbsolutePath = false) {
+            let newPath;
+            if (isAbsolutePath) {
+                newPath = dirName;
+            } else {
+                newPath = currentPath ? `${currentPath}/${dirName}` : dirName;
+            }
+            loadstorageFileList(null, newPath);
+        }
+
+        async function loadAllFiles() {
+            const loadAllBtn = document.getElementById('loadAllBtn');
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+
+            if (loadAllBtn) {
+                loadAllBtn.innerHTML = '<div class="spinner" style="width: 20px; height: 20px; border-width: 2px; margin: 0 auto;"></div>';
+                loadAllBtn.disabled = true;
+            }
+            if (loadMoreBtn) {
+                loadMoreBtn.disabled = true;
+            }
+
+            try {
+                while (nextContinuationToken) {
+                    const params = new URLSearchParams();
+                    if (currentPath) params.set('path', currentPath);
+                    params.set('continuationToken', nextContinuationToken);
+                    const url = `/api/files?${params.toString()}`;
+
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch file list');
+                    }
+                    const data = await response.json();
+
+                    // Remove existing "Load More" container
+                    const existingLoadMoreContainer = document.getElementById('loadMoreContainer');
+                    if (existingLoadMoreContainer) {
+                        existingLoadMoreContainer.remove();
+                    }
+
+                    storageFiles.push(...(data.files || []));
+                    nextContinuationToken = data.nextContinuationToken;
+
+                    const container = document.getElementById('fileListContainer');
+                    const newFilesHtml = (data.files || []).map((file) => {
+                        const index = storageFiles.findIndex(f => f.key === file.key);
+                        if (file.type === 'directory') {
+                            return `
+                            <div class="file-item directory-item" data-index="${index}" onclick="navigateToDirectory('${escapeHtml(file.name)}')">
+                                <div class="file-item-content">
+                                    <div class="file-item-info">
+                                        <div class="file-name"><span class="directory-icon">📁</span>${escapeHtml(file.name)}</div>
+                                        <div class="file-meta">Directory</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        } else {
+                            return `
+                            <div class="file-item" data-index="${index}" onclick="selectstorageFile(${index})">
+                                <div class="file-item-content">
+                                    <div class="file-item-info">
+                                        <div class="file-name">${escapeHtml(file.name)}</div>
+                                        <div class="file-meta">
+                                            ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div class="file-item-buttons">
+                                        <button class="download-btn" onclick="downloadFile(event, ${index})">Download</button>
+                                        <button class="archive-btn" onclick="archiveFile(event, ${index})">Archive</button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        }
+                    }).join('');
+
+                    container.insertAdjacentHTML('beforeend', newFilesHtml);
+                }
+            } catch (error) {
+                swal('Error', `Error loading all files: ${error.message}`, 'error');
+                // Re-enable buttons on error if there are still more to load
+                if (nextContinuationToken) {
+                    const container = document.getElementById('fileListContainer');
+                    const loadMoreButton = `
+                        <div id="loadMoreContainer" style="text-align: center; padding: 1rem; display: flex; gap: 1rem; justify-content: center;">
+                            <button id="loadMoreBtn" class="upload-btn" onclick="loadstorageFileList('${nextContinuationToken}')">Load More</button>
+                            <button id="loadAllBtn" class="upload-btn" onclick="loadAllFiles()">Load All</button>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', loadMoreButton);
+                }
+            }
+        }
+
         function selectstorageFile(index) {
             const file = storageFiles[index];
-            // Redirect to /files/{filename} URL
-            window.location.href = `/files/${file.name}`;
+            // Build the path: include currentPath if we're in a subdirectory
+            const filePath = currentPath ? `${currentPath}/${file.name}` : file.name;
+            // Redirect to /files/{path} URL
+            window.location.href = `/files/${filePath}`;
         }
 
         function filterFileList() {
@@ -930,28 +1135,41 @@
             });
 
             if (filteredFiles.length === 0) {
-                container.innerHTML = '<div class="empty-state"><p>No files match your search</p></div>';
+                container.innerHTML = '<div class="empty-state"><p>No items match your search</p></div>';
                 return;
             }
 
             container.innerHTML = filteredFiles.map((file) => {
                 const originalIndex = storageFiles.indexOf(file);
-                return `
-                    <div class="file-item" data-index="${originalIndex}" onclick="selectstorageFile(${originalIndex})">
-                        <div class="file-item-content">
-                            <div class="file-item-info">
-                                <div class="file-name">${escapeHtml(file.name)}</div>
-                                <div class="file-meta">
-                                    ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                if (file.type === 'directory') {
+                    return `
+                        <div class="file-item directory-item" data-index="${originalIndex}" onclick="navigateToDirectory('${escapeHtml(file.name)}')">
+                            <div class="file-item-content">
+                                <div class="file-item-info">
+                                    <div class="file-name"><span class="directory-icon">📁</span>${escapeHtml(file.name)}</div>
+                                    <div class="file-meta">Directory</div>
                                 </div>
                             </div>
-                            <div class="file-item-buttons">
-                                <button class="download-btn" onclick="downloadFile(event, ${originalIndex})">Download</button>
-                                <button class="archive-btn" onclick="archiveFile(event, ${originalIndex})">Archive</button>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="file-item" data-index="${originalIndex}" onclick="selectstorageFile(${originalIndex})">
+                            <div class="file-item-content">
+                                <div class="file-item-info">
+                                    <div class="file-name">${escapeHtml(file.name)}</div>
+                                    <div class="file-meta">
+                                        ${formatBytes(file.size)} • ${new Date(file.lastModified).toLocaleString()}
+                                    </div>
+                                </div>
+                                <div class="file-item-buttons">
+                                    <button class="download-btn" onclick="downloadFile(event, ${originalIndex})">Download</button>
+                                    <button class="archive-btn" onclick="archiveFile(event, ${originalIndex})">Archive</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }).join('');
 
             // After filtering, there's no "load more" because we are showing a subset of already loaded files.

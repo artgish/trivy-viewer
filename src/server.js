@@ -32,19 +32,33 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 
-// List JSON files (active path only) with pagination
+// List JSON files and directories (active path) with pagination
+// Supports recursive directory navigation via 'path' query parameter
 app.get('/api/files', async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 1000, 1000);
+    const limit = Math.min(parseInt(req.query.limit) || 100, 100);
     const continuationToken = req.query.continuationToken || undefined;
+    const subPath = req.query.path || '';
+
+    // Build the full path: activePath + optional subPath
+    let fullPath = storageProvider.activePath;
+    if (subPath) {
+      // Sanitize subPath to prevent directory traversal
+      const sanitizedPath = subPath.split('/').filter(p => p && p !== '..').join('/');
+      fullPath = `${storageProvider.activePath}/${sanitizedPath}`;
+    }
 
     const result = await storageProvider.listFiles(
-      storageProvider.activePath,
+      fullPath,
       limit,
       continuationToken
     );
 
-    res.json(result);
+    // Include the current path in response for navigation
+    res.json({
+      ...result,
+      currentPath: subPath || ''
+    });
   } catch (error) {
     console.error('Error listing files:', error);
     res.status(500).json({ error: 'Failed to list files', details: error.message });
@@ -152,7 +166,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // Direct file viewer - serves HTML which will auto-load the file
-app.get('/files/:filename', (req, res) => {
+// Supports nested paths like /files/subdir/report.json
+app.get('/files/:filepath(*)', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
